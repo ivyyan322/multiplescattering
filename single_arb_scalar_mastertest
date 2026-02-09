@@ -1,0 +1,222 @@
+%% Parameters
+Nd = 100;       % boundary discretization points on Γ
+k = 3; % wavenumber 
+h = 2*pi/Nd; 
+
+N = 4; 
+nvec = -N:N;
+
+%% 1. Build arbitrary obstacle Γ (elipse)
+a = 1;       
+b = 1.2;      
+t = linspace(0,2*pi,Nd+1); 
+t = t(1:Nd);
+dt = t(2)-t(1);
+x = a*cos(t');
+y = b*sin(t');   % ellipse boundary
+r = sqrt(x.^2 + y.^2); 
+theta = atan2(y,x);
+
+% input: u_inc = e^ikx
+%uinc = zeros(M,1); 
+%for i = 1: length(nvec)
+%    n = nvec(i);
+%    uinc_c = (1i)^n.*besselj(n,k*r).*exp(1i*n*theta);
+ %   uinc = uinc + uinc_c; 
+%end 
+
+
+xo = 2;
+yo = 2;
+ro = sqrt(xo^2 + yo^2);
+
+m = -3; 
+uinc = (1i).^m*besselj(m,k*r).*exp(1i*m*theta);
+a = zeros(size(nvec));
+a(nvec == m) = (1i)^m;   % only one active mode
+
+%uinc = (1i/4).*besselh(0,1,k*r)
+
+u = direct_bie(Nd,uinc,x,y,t,k,xo,yo)
+%u_exact = (1i/4).*besselh(0,1,k*ro)
+
+L = scatter_matrix_full(k,x,y,N);
+u_mat = scatteringmatrixeval(a,L,xo,yo,k,N)
+
+err = abs(u_mat) - abs(u)
+abs(u)
+abs(u_mat)
+
+function u = scatteringmatrixeval(a,L,xo,yo,k,N)
+b_n = a*L; 
+ro = sqrt(xo.^2 + yo.^2); 
+theta_o = atan2(yo,xo); 
+nvec = -N:N; 
+u_out=0;
+for idx4 = 1:length(nvec)
+    l = nvec(idx4);
+    if l < 0
+        Hn_p_x = besselh(abs(l),1,k*ro) .* ((-1).^abs(l));
+    else
+        Hn_p_x = besselh(l,1,k*ro);
+    end 
+    u_out = u_out + b_n(idx4)*Hn_p_x*exp(1i*l*theta_o);
+end 
+u = u_out;
+end 
+
+function [u] = direct_bie(Nd,uinc,x,y,t,k,xo,yo)
+
+dx = gradient(x,t);
+dy = gradient(y,t);
+ds = sqrt(dx.^2 + dy.^2); 
+
+tx = dx ./ ds;      % unit tangent
+ty = dy ./ ds;
+nx = ty;           % outward normal
+ny = -tx;
+
+% discretizing enclosure P of the arbitrary shape 
+M = length(x);
+h = 2*pi/Nd; 
+
+
+f = uinc; 
+%f = (1i/4).*besselh(0,1,k*r);
+
+% step 1: build single / double layer operators / solve for density 
+D_k = D_operator(k,x,y,dx,dy,ds); 
+
+
+Dens_op = -eye(M)/2 + h*(D_k); 
+
+phi = (Dens_op) \ f;
+
+% test u_out vs input for points outside of the boundary 
+kern2 = zeros(Nd,1);
+for i = 1:Nd
+    rx_o = xo-x(i); 
+    ry_o = yo-y(i);
+    r_o  = sqrt(rx_o^2 + ry_o^2);
+    rt = sqrt((xo - x(i))^2 + (yo - y(i))^2);
+    dPhidx_o = -(1i*k/4) * besselh(1,1,k*rt) * (rx_o/rt);
+    dPhidy_o = -(1i*k/4) * besselh(1,1,k*rt) * (ry_o/rt);
+    kern2(i) = (dPhidx_o*nx(i) + dPhidy_o*ny(i)) * ds(i);
+end 
+
+% get u 
+u = h*phi'*kern2;
+end 
+
+function [Dk] = D_operator(k,x,y,dx,dy,ds) 
+% input: 
+% k - wave number 
+% (x,y) - points along boundary 
+% (dx,dy) - gradient of points along boundary 
+% ds - sqrt(dx.^2 + dy.^2) 
+
+% output: 
+% Dk - potential operator in the normal direction (target centered @
+% vector it applies to, from source on boundary) 
+
+
+tx = dx ./ ds;      % unit tangent
+ty = dy ./ ds;
+nx = ty;           % outward normal
+ny = -tx;
+
+M = length(x); 
+Dk = zeros(M); 
+
+for i = 1:M % points along source 
+    for j = 1:M % points along target 
+        rx = x(i)-x(j); 
+        ry = y(i)-y(j);
+        r  = sqrt(rx^2 + ry^2);
+        if i == j
+            Dk(i,j)=0; 
+        else
+            
+            % evaluating kernel 
+            dPhidx = -(1i*k/4) * besselh(1,1,k*r) * (rx/r);
+            dPhidy = -(1i*k/4) * besselh(1,1,k*r) * (ry/r);
+            Dk(i,j) = (dPhidx*nx(j) + dPhidy*ny(j)) * ds(j);
+        end
+    end
+end
+end
+
+function L = scatter_matrix_full(k,x,y,N)
+L = zeros(2*N+1,2*N+1); 
+nvec = -N:N;
+
+% constructing full matrix 
+for idx = 1:length(nvec) 
+    l = nvec(idx);
+    b_ln = scattering_An_arb(l, k, x,y,N);
+    L(idx,:) = b_ln;
+end 
+end 
+
+function [b_ln]= scattering_An_arb(l,k,x,y,N)
+
+% input: 
+% l - fourier node for output coefficient l 
+% kp - compressional wave number 
+% ks - shear wave number 
+% R - radius 
+% x,y - boundary points of object (centered at origin) 
+
+% output: 
+% An  2x2 scattering matrix for fourier node n 
+
+% discretizing enclosure P of the arbitrary shape 
+ M = length(x);
+ t = linspace(0, 2*pi, M+1); t(end) = [];
+ dx = gradient(x,t);
+ dy = gradient(y,t);
+ ds = sqrt(dx.^2 + dy.^2); 
+ r = sqrt(x.^2 + y.^2); 
+ h = 2*pi/M;
+ tx = dx ./ ds;      % unit tangent
+ty = dy ./ ds;
+nx = ty;           % outward normal
+ny = -tx;
+
+theta = atan2(y,x);
+
+% step 1: build single / double layer operators / solve for density 
+D_k = D_operator(k,x,y,dx,dy,ds); 
+
+Dens_op =  -eye(M)/2 + h*D_k; 
+
+
+% step 2: precompute the multipole expansion 
+b_ln = zeros(1,2*N+1);
+kern2 = zeros(M,1); 
+%for idx = 1:M
+%   kern2(idx) = besselj(l,k*r(idx))*exp(-1i*l*theta(idx))*ds(idx); 
+%end 
+
+
+Jl = besselj(l, k*r);
+Jl_p = 0.5 * ( besselj(l-1, k*r) - besselj(l+1, k*r) );  % J_l'(kr)
+phi = Jl .* exp(-1i*l*theta);
+dphi_dr     = k * Jl_p .* exp(-1i*l*theta);
+dphi_dtheta = -1i*l * phi;
+dphi_dx = cos(theta).*dphi_dr - sin(theta).*(1./r).*dphi_dtheta;
+dphi_dy = sin(theta).*dphi_dr + cos(theta).*(1./r).*dphi_dtheta;
+dphi_dn = dphi_dx .* nx + dphi_dy .* ny;
+
+kern2 = dphi_dn.*ds; 
+
+
+for n = -N:N
+    uinc = besselj(n, k*r) .* exp(1i*n*theta);
+    density_n = Dens_op \ uinc; 
+    b_ln(n+N+1) = (1i/4)*h*density_n.'*kern2; 
+end 
+
+
+end 
+
