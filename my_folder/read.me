@@ -1,1 +1,16 @@
+Optimization with Scattering Project: 
+Consider M number of objects in space, each with a sound hard boundary conditions. I.e. u(n) = 0; du/dn = 0. We have originally designed / written codde that woudl solve the field u(x,y) at any given point for a incoming field (via a scattering matrix formulation + GMRES). 
+Now consider the optimization problem where there are M number of objects in space, and there are n number of points along the boundary of the space ( in theory they could be anywhere), and we want to maximize the magnitude of the field at this points, w.r.t. different input parameters of the system such as rotational angle, shape of elipse etc. (further descirbed in the system). 
+
+
+The project will be broken up into phases / with descriptions and corresponding code files: 
+1. Phase one: Implments scattering matrix for the problem with quadrature weights correction, solves with accurancy up to eps and implments scattering matrix with rotation of arbitrary angle 
+funcionts: 
+kress_weights, S_kess, D_kress, N_kress, T_diff_kress -- implmenetaion of quadrature correction weights 
+scattering_matrix_full -- scattering matrix via BIE 
+scattering_An_arb -- single row of scattering matrix 
+Rotate-scattering_matrix -- implements scattering matrix with rotation of a certain angle 
+
+2: Phase two: implments function that solves the field via output from scattering matrix (betas) 
+
 
