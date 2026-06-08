@@ -5,12 +5,33 @@ Now consider the optimization problem where there are M number of objects in spa
 
 The project will be broken up into phases / with descriptions and corresponding code files: 
 1. Phase one: Implments scattering matrix for the problem with quadrature weights correction, solves with accurancy up to eps and implments scattering matrix with rotation of arbitrary angle 
-funcionts: 
+files: 
 kress_weights, S_kess, D_kress, N_kress, T_diff_kress -- implmenetaion of quadrature correction weights 
 scattering_matrix_full -- scattering matrix via BIE 
 scattering_An_arb -- single row of scattering matrix 
 Rotate-scattering_matrix -- implements scattering matrix with rotation of a certain angle 
 
 2: Phase two: implments function that solves the field via output from scattering matrix (betas) 
+files: 
+building_translation_matrix -- budils M2L matrices (objects to objects scattering matrix) 
+Buiild_insident_coefficeint -- translates incoming field to coefficeint alphas 
+solve_multiple_scattering -- sovles for coeffcient beta 
+eval_field_ms -- evaluates fields from beta 
+
+3. Phase tree: implements FMM on the scattering matrix to speed it up 
+files: 
+fmm_box_assign -- box partitioning 
+fmm_params -- select FMM parameters 
+fmm_min_box_size -- pick min box size 
+fmm_aggregation -- aggregation matrices 
+fmm_translation_plane_wave 
+fmm_near matrix 
+fmm_precompute 
+fmm_matvec
+solve_multiple_scattering_fmm -- FMM-GMRES solver 
+
+4. Phase four: compute field on a full grid instead of one point 
+files: 
+compute_field_grid 
 
 
